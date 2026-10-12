@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PoseFit AI Studio - Edição de Roupas & Poses em Fotos</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#090a0f',
+                        darkcard: '#13151f',
+                        darkborder: '#232636',
+                        accent: '#a855f7',
+                        cyanaccent: '#06b6d4',
+                        roseaccent: '#f43f5e'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Font Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .glass-panel {
+            background: rgba(19, 21, 31, 0.85);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #090a0f; }
+        ::-webkit-scrollbar-thumb { background: #232636; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #3b3f57; }
+
+        /* Split view comparison slider styling */
+        .split-container {
+            position: relative;
+            user-select: none;
+            overflow: hidden;
+        }
+        .split-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 50%;
+            overflow: hidden;
+            border-right: 2px solid #06b6d4;
+            box-shadow: 2px 0 12px rgba(6, 182, 212, 0.4);
+        }
+        .split-handle {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%) translateX(-50%);
+            left: 50%;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #06b6d4;
+            border: 3px solid #ffffff;
+            cursor: ew-resize;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+            z-index: 30;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            font-size: 12px;
+        }
+
+        /* Canvas Canvas Mesh Grid simulation */
+        .ai-grid-pattern {
+            background-size: 24px 24px;
+            background-image: 
+                linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        }
+
+        /* Scanner line animation for AI processing simulation */
+        @keyframes scanline {
+            0% { top: 0%; opacity: 0.8; }
+            50% { opacity: 1; }
+            100% { top: 100%; opacity: 0.8; }
+        }
+        .animate-scanline {
+            animation: scanline 2.2s ease-in-out infinite alternate;
+        }
+    </style>
+</head>
+<body class="bg-darkbg text-zinc-100 min-h-screen flex flex-col overflow-x-hidden">
+
+    <!-- Header Navbar -->
+    <header class="glass-panel border-b border-darkborder sticky top-0 z-50 px-4 md:px-6 py-3 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-purple-500/20">
+                <i class="fa-solid fa-wand-magic-sparkles text-lg"></i>
+            </div>
+            <div>
+                <h1 class="font-extrabold text-base md:text-xl tracking-tight bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
+                    PoseFit <span class="text-cyan-400 font-light">AI Studio</span>
+                </h1>
+                <p class="text-[11px] text-zinc-400 hidden sm:block">Editor de Roupas, Despi & Transformação de Poses em Fotos Pessoais</p>
+            </div>
+        </div>
+
+        <!-- Workflow Step Indicator & Main Actions -->
+        <div class="flex items-center space-x-2 md:space-x-4">
+            <div class="hidden lg:flex items-center space-x-2 text-xs bg-darkbg/80 px-3 py-1.5 rounded-xl border border-darkborder">
+                <span class="text-cyan-400 font-bold">1. Foto</span>
+                <i class="fa-solid fa-chevron-right text-[10px] text-zinc-600"></i>
+                <span class="text-purple-400 font-bold">2. Estilo/Maquiagem</span>
+                <i class="fa-solid fa-chevron-right text-[10px] text-zinc-600"></i>
+                <span class="text-emerald-400 font-bold">3. Exportar HD</span>
+            </div>
+
+            <button onclick="openExportModal()" class="bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white px-3.5 py-1.5 rounded-xl text-xs md:text-sm font-semibold transition shadow-lg shadow-purple-600/20 flex items-center space-x-2">
+                <i class="fa-solid fa-download"></i>
+                <span class="hidden sm:inline">Exportar / Aumentar Qualidade</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Application Grid -->
+    <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 p-3 md:p-5 max-w-[1700px] mx-auto w-full">
+
+        <!-- LEFT COLUMN: Photo Upload & Anatomy Reconstruction (3 Cols) -->
+        <aside class="lg:col-span-3 flex flex-col space-y-4">
+            
+            <!-- Upload Box -->
+            <div class="glass-panel rounded-2xl p-4 shadow-xl space-y-3">
+                <h2 class="font-bold text-sm md:text-base flex items-center space-x-2 text-zinc-200 border-b border-darkborder pb-2.5">
+                    <i class="fa-solid fa-cloud-arrow-up text-cyan-400"></i>
+                    <span>Sua Foto Pessoal</span>
+                </h2>
+
+                <!-- Drag & Drop Zone -->
+                <div id="drop-zone" onclick="document.getElementById('photo-input').click()" ondragover="handleDragOver(event)" onmouseleave="handleDragLeave()" ondrop="handleFileDrop(event)" class="border-2 border-dashed border-zinc-700/80 hover:border-cyan-500/80 bg-zinc-900/40 hover:bg-cyan-950/20 rounded-2xl p-4 text-center cursor-pointer transition flex flex-col items-center justify-center space-y-2 group">
+                    <div class="w-10 h-10 rounded-full bg-cyan-950/60 text-cyan-400 border border-cyan-500/30 flex items-center justify-center text-lg group-hover:scale-110 transition">
+                        <i class="fa-solid fa-image"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-bold text-zinc-200">Arraste sua foto aqui</p>
+                        <p class="text-[11px] text-zinc-400 mt-0.5">ou clique para selecionar</p>
+                    </div>
+                    <input type="file" id="photo-input" accept="image/*" class="hidden" onchange="handleFileSelect(event)">
+                </div>
+
+                <!-- Sample Photos Selector -->
+                <div class="space-y-1.5 pt-1">
+                    <span class="text-xs font-medium text-zinc-400">Exemplos para teste rápido:</span>
+                    <div class="grid grid-cols-3 gap-2" id="sample-photos-grid">
+                        <!-- Samples rendered via JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Advanced Bare Body & Anatomy Reconstruction Studio -->
+            <div class="glass-panel rounded-2xl p-4 shadow-xl space-y-3 bg-gradient-to-b from-rose-950/30 via-darkcard to-darkcard border border-rose-900/40">
+                <div class="flex items-center justify-between border-b border-rose-900/30 pb-2">
+                    <h3 class="font-bold text-xs md:text-sm text-rose-200 flex items-center space-x-2">
+                        <i class="fa-solid fa-user-slash text-rose-400"></i>
+                        <span>Recriação Corporal (Despido)</span>
+                    </h3>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="bare-mode-toggle" class="sr-only peer" onchange="toggleBareSkinMode(this.checked)">
+                        <div class="w-9 h-5 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rose-600"></div>
+                    </label>
+                </div>
+                
+                <p class="text-[11px] text-zinc-400 leading-relaxed">
+                    Remove totalmente o vestuário e reconstrói as partes ocultas do corpo com tom de pele realista e formatos anatômicos.
+                </p>
+
+                <!-- Anatomy Customization Sub-controls -->
+                <div id="anatomy-controls" class="space-y-3 pt-2 opacity-50 pointer-events-none transition-all">
+                    <div>
+                        <div class="flex justify-between text-[11px] text-zinc-300 mb-1">
+                            <span>Tom & Melancia da Pele</span>
+                            <span class="text-rose-400 font-mono" id="skin-tone-val">Natural AI</span>
+                        </div>
+                        <div class="flex items-center space-x-1.5 overflow-x-auto pb-1" id="skin-tones-palette">
+                            <!-- Skin tones rendered by JS -->
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-[11px] text-zinc-300 mb-1">
+                            <span>Silhueta / Definição Corporal</span>
+                            <span class="text-rose-400 font-mono" id="val-body-shape">Natural</span>
+                        </div>
+                        <input type="range" min="1" max="4" value="2" id="slider-body-shape" onchange="updateAnatomySettings()" class="w-full accent-rose-500 bg-zinc-800 h-1.5 rounded-lg cursor-pointer">
+                        <div class="flex justify-between text-[9px] text-zinc-500 font-medium">
+                            <span>Magra</span>
+                            <span>Natural</span>
+                            <span>Curvilínea</span>
+                            <span>Atlética</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Enhancement & Upscale Panel -->
+            <div class="glass-panel rounded-2xl p-4 shadow-xl space-y-3">
+                <h3 class="font-bold text-xs md:text-sm text-zinc-200 flex items-center space-x-2 border-b border-darkborder pb-2">
+                    <i class="fa-solid fa-wand-magic text-cyan-400"></i>
+                    <span>Aprimoramento de Nitidez</span>
+                </h3>
+                
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-zinc-300">Nitidez & Super-Resolução</span>
+                        <input type="checkbox" id="chk-upscale" onchange="updateCanvasDisplay()" checked class="accent-cyan-400 w-4 h-4 rounded cursor-pointer">
+                    </div>
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-zinc-300">Suavização de Pele HD</span>
+                        <input type="checkbox" id="chk-skin-smooth" onchange="updateCanvasDisplay()" checked class="accent-cyan-400 w-4 h-4 rounded cursor-pointer">
+                    </div>
+                </div>
+            </div>
+
+        </aside>
+
+        <!-- CENTER COLUMN: Canvas Workspace & AI Processor (6 Cols) -->
+        <section class="lg:col-span-6 flex flex-col space-y-4">
+            
+            <!-- Canvas Viewport -->
+            <div class="relative glass-panel rounded-2xl overflow-hidden shadow-2xl flex-1 min-h-[460px] md:min-h-[580px] flex flex-col ai-grid-pattern" id="canvas-viewport">
+                
+                <!-- Viewport Top Bar Controls -->
+                <div class="absolute top-3 left-3 right-3 z-30 flex justify-between items-center pointer-events-none">
+                    <!-- Status Badge -->
+                    <div class="bg-black/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 text-xs font-medium text-zinc-200 pointer-events-auto flex items-center space-x-2 shadow-lg">
+                        <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                        <span id="canvas-status-text">Visualização do Estúdio</span>
+                    </div>
+
+                    <!-- Compare Mode Switch -->
+                    <div class="bg-black/80 backdrop-blur-md p-1 rounded-xl border border-white/10 pointer-events-auto flex items-center space-x-1 text-xs">
+                        <button onclick="setCompareMode('split')" id="btn-mode-split" class="px-2.5 py-1 rounded-lg bg-cyan-600 text-white font-semibold transition">Dividido</button>
+                        <button onclick="setCompareMode('side')" id="btn-mode-side" class="px-2.5 py-1 rounded-lg hover:bg-white/10 text-zinc-400 font-medium transition">Lado a Lado</button>
+                    </div>
+                </div>
+
+                <!-- Interactive Main Stage Canvas -->
+                <div class="flex-1 relative flex items-center justify-center p-3 select-none overflow-hidden" id="interactive-stage">
+                    
+                    <!-- Single Container / Split View Viewport -->
+                    <div class="relative max-w-full max-h-[520px] rounded-xl overflow-hidden shadow-2xl border border-zinc-800 flex items-center justify-center" id="photo-wrapper">
+                        
+                        <!-- Base Original Photo -->
+                        <img id="img-original" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=800&auto=format&fit=crop" alt="Original Photo" class="max-h-[500px] w-auto object-contain transition-transform duration-300">
+
+                        <!-- AI Output Transformed Layer -->
+                        <div id="ai-output-layer" class="absolute inset-0 flex items-center justify-center overflow-hidden transition-all duration-300">
+                            <img id="img-transformed" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=800&auto=format&fit=crop" alt="Transformed Photo" class="max-h-[500px] w-auto object-contain transition-transform duration-300">
+                            <!-- Overlay Canvas for Filters, Makeup Tinting, and Skeleton Pose Simulation -->
+                            <canvas id="stage-overlay-canvas" class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
+                        </div>
+
+                        <!-- Split Comparison Slider (Active in Split Mode) -->
+                        <div id="split-slider-box" class="split-overlay">
+                            <img id="img-split-before" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=800&auto=format&fit=crop" class="max-h-[500px] w-auto object-contain max-w-none">
+                            <span class="absolute top-3 left-3 bg-black/80 backdrop-blur-md px-2 py-0.5 rounded text-[10px] font-bold text-cyan-300 border border-cyan-500/40">FOTO ORIGINAL</span>
+                        </div>
+                        <div id="split-handle-btn" class="split-handle">
+                            <i class="fa-solid fa-arrows-left-right"></i>
+                        </div>
+
+                    </div>
+
+                    <!-- AI Processing Overlay Spinner / Scanner -->
+                    <div id="ai-processing-modal" class="absolute inset-0 bg-black/85 backdrop-blur-lg z-40 flex flex-col items-center justify-center space-y-4 opacity-0 pointer-events-none transition-opacity duration-300">
+                        <div class="relative w-28 h-28 flex items-center justify-center">
+                            <div class="absolute inset-0 rounded-full border-4 border-cyan-500/20 border-t-cyan-400 animate-spin"></div>
+                            <div class="absolute inset-2 rounded-full border-4 border-purple-500/20 border-b-purple-400 animate-spin" style="animation-direction: reverse; animation-duration: 1.5s;"></div>
+                            <i class="fa-solid fa-wand-magic-sparkles text-3xl text-cyan-400 animate-pulse"></i>
+                        </div>
+                        <div class="text-center space-y-1">
+                            <h4 class="font-bold text-base text-zinc-100" id="ai-step-title">Processando Mapeamento Corporal...</h4>
+                            <p class="text-xs text-zinc-400 font-mono" id="ai-step-detail">Segmentando vestuário e reconstruindo malha corporal</p>
+                        </div>
+                        <!-- Progress Bar -->
+                        <div class="w-64 h-2 bg-zinc-800 rounded-full overflow-hidden border border-zinc-700">
+                            <div id="ai-progress-bar" class="h-full bg-gradient-to-r from-purple-500 via-indigo-500 to-cyan-400 w-0 transition-all duration-300"></div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Bottom Floating Stage Controls -->
+                <div class="p-3 border-t border-darkborder bg-black/40 backdrop-blur-md flex flex-wrap items-center justify-between gap-2 z-20">
+                    <!-- Zoom & Reset -->
+                    <div class="flex items-center space-x-1">
+                        <button onclick="zoomCanvas(0.1)" class="p-2 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 rounded-xl text-xs transition border border-zinc-700" title="Zoom In"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+                        <button onclick="zoomCanvas(-0.1)" class="p-2 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 rounded-xl text-xs transition border border-zinc-700" title="Zoom Out"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+                        <button onclick="resetCanvasZoom()" class="p-2 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 rounded-xl text-xs transition border border-zinc-700" title="Resetar Câmera"><i class="fa-solid fa-rotate-left"></i></button>
+                    </div>
+
+                    <!-- Trigger AI Render Button -->
+                    <button onclick="triggerAIGeneration()" class="bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white font-extrabold px-5 py-2 rounded-xl text-xs md:text-sm shadow-xl shadow-purple-600/30 flex items-center space-x-2 transition transform hover:scale-105 active:scale-95">
+                        <i class="fa-solid fa-sparkles"></i>
+                        <span>Gerar Transformação IA</span>
+                    </button>
+
+                    <!-- Show Mesh Grid Toggle -->
+                    <button onclick="toggleSkeletonOverlay()" id="btn-toggle-skeleton" class="px-3 py-1.5 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 rounded-xl text-xs font-semibold transition border border-zinc-700 flex items-center space-x-1.5">
+                        <i class="fa-solid fa-bone text-cyan-400"></i>
+                        <span class="hidden sm:inline">Esqueleto 3D</span>
+                    </button>
+                </div>
+
+            </div>
+
+        </section>
+
+        <!-- RIGHT COLUMN: Tabbed Control Panel (Clothing, Makeup, Pose) (3 Cols) -->
+        <aside class="lg:col-span-3 flex flex-col space-y-4">
+            
+            <!-- Tab Navigation Header -->
+            <div class="glass-panel p-1 rounded-2xl flex items-center justify-between border border-darkborder">
+                <button onclick="setActiveTab('outfit')" id="tab-btn-outfit" class="flex-1 py-2 text-xs font-bold rounded-xl transition flex items-center justify-center space-x-1.5 bg-purple-600 text-white shadow-md">
+                    <i class="fa-solid fa-shirt"></i>
+                    <span>Roupas</span>
+                </button>
+                <button onclick="setActiveTab('makeup')" id="tab-btn-makeup" class="flex-1 py-2 text-xs font-bold rounded-xl transition flex items-center justify-center space-x-1.5 text-zinc-400 hover:text-white">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span>Maquiagem</span>
+                </button>
+                <button onclick="setActiveTab('pose')" id="tab-btn-pose" class="flex-1 py-2 text-xs font-bold rounded-xl transition flex items-center justify-center space-x-1.5 text-zinc-400 hover:text-white">
+                    <i class="fa-solid fa-person-walking"></i>
+                    <span>Pose</span>
+                </button>
+            </div>
+
+            <!-- TAB 1: OUTFIT & FABRICS -->
+            <div id="tab-content-outfit" class="glass-panel rounded-2xl p-4 shadow-xl space-y-3 flex-1 flex flex-col">
+                <h3 class="font-bold text-xs md:text-sm text-zinc-200 flex items-center space-x-2 border-b border-darkborder pb-2.5">
+                    <i class="fa-solid fa-shirt text-purple-400"></i>
+                    <span>Estilos de Roupas & Tecidos</span>
+                </h3>
+
+                <div class="grid grid-cols-2 gap-2 max-h-[180px] overflow-y-auto pr-1" id="preset-styles-grid">
+                    <!-- Style Presets rendered via JS -->
+                </div>
+
+                <!-- Color Swatches -->
+                <div class="space-y-1.5 pt-2 border-t border-darkborder">
+                    <label class="text-[11px] font-medium text-zinc-400">Cor Principal do Vestuário</label>
+                    <div class="flex items-center space-x-2 overflow-x-auto pb-1" id="garment-color-swatches">
+                        <!-- Swatches rendered via JS -->
+                    </div>
+                </div>
+
+                <!-- Fabric Textures -->
+                <div class="space-y-1.5 pt-2">
+                    <label class="text-[11px] font-medium text-zinc-400">Textura do Material</label>
+                    <div class="grid grid-cols-2 gap-2" id="fabric-textures-grid">
+                        <button onclick="selectFabric('cotton')" id="fab-btn-cotton" class="p-2 rounded-xl border border-cyan-500/50 bg-cyan-950/20 text-xs font-semibold text-cyan-300">Algodão Premium</button>
+                        <button onclick="selectFabric('leather')" id="fab-btn-leather" class="p-2 rounded-xl border border-zinc-800 bg-zinc-900 text-xs font-semibold text-zinc-400 hover:text-zinc-200">Couro Sintético</button>
+                        <button onclick="selectFabric('silk')" id="fab-btn-silk" class="p-2 rounded-xl border border-zinc-800 bg-zinc-900 text-xs font-semibold text-zinc-400 hover:text-zinc-200">Seda / Satin</button>
+                        <button onclick="selectFabric('denim')" id="fab-btn-denim" class="p-2 rounded-xl border border-zinc-800 bg-zinc-900 text-xs font-semibold text-zinc-400 hover:text-zinc-200">Jeans Denim</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: DEDICATED MAKEUP STUDIO -->
+            <div id="tab-content-makeup" class="glass-panel rounded-2xl p-4 shadow-xl space-y-3 flex-1 flex flex-col hidden">
+                <h3 class="font-bold text-xs md:text-sm text-zinc-200 flex items-center space-x-2 border-b border-darkborder pb-2.5">
+                    <i class="fa-solid fa-sparkles text-rose-400"></i>
+                    <span>Estúdio de Maquiagem IA</span>
+                </h3>
+
+                <div class="space-y-3 overflow-y-auto max-h-[380px] pr-1">
+                    <!-- Batom / Lipstick -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-zinc-300 font-medium">Batom & Lábios</span>
+                            <span class="text-rose-400 font-mono text-[11px]" id="val-lipstick">Vermelho Aveludado</span>
+                        </div>
+                        <div class="flex items-center space-x-1.5 overflow-x-auto pb-1" id="lipstick-color-palette">
+                            <!-- Lip colors JS -->
+                        </div>
+                    </div>
+
+                    <!-- Eyeliner & Sombra -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-zinc-300 font-medium">Sombra dos Olhos</span>
+                            <span class="text-purple-400 font-mono text-[11px]" id="val-eyeshadow">Smokey Glam</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-1.5" id="eyeshadow-presets">
+                            <button onclick="setEyeshadow('natural')" class="p-1.5 rounded-lg border border-zinc-700 bg-zinc-900 text-[10px] font-semibold text-zinc-300">Natural</button>
+                            <button onclick="setEyeshadow('smokey')" class="p-1.5 rounded-lg border border-purple-500 bg-purple-950/40 text-[10px] font-semibold text-purple-300">Smokey</button>
+                            <button onclick="setEyeshadow('gold')" class="p-1.5 rounded-lg border border-zinc-700 bg-zinc-900 text-[10px] font-semibold text-zinc-300">Dourado</button>
+                        </div>
+                    </div>
+
+                    <!-- Blush e Contorno -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-zinc-300 font-medium">Blush & Iluminador</span>
+                            <span class="text-cyan-400 font-mono text-[11px]" id="val-blush">75% Intensity</span>
+                        </div>
+                        <input type="range" min="0" max="100" value="75" id="slider-blush" oninput="updateMakeupSettings()" class="w-full accent-rose-400 bg-zinc-800 h-1.5 rounded-lg cursor-pointer">
+                    </div>
+
+                    <!-- Base & Smooth Skin -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-zinc-300 font-medium">Acabamento de Base na Pele</span>
+                            <span class="text-emerald-400 font-mono text-[11px]" id="val-foundation">Matte HD</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="setFoundation('matte')" id="fnd-btn-matte" class="p-2 rounded-xl border border-rose-500/60 bg-rose-950/30 text-xs font-semibold text-rose-300">Efeito Matte</button>
+                            <button onclick="setFoundation('glow')" id="fnd-btn-glow" class="p-2 rounded-xl border border-zinc-800 bg-zinc-900 text-xs font-semibold text-zinc-400">Glow Radiante</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: POSE & ANGLE TRANSFORMER -->
+            <div id="tab-content-pose" class="glass-panel rounded-2xl p-4 shadow-xl space-y-3 flex-1 flex flex-col hidden">
+                <h3 class="font-bold text-xs md:text-sm text-zinc-200 flex items-center space-x-2 border-b border-darkborder pb-2.5">
+                    <i class="fa-solid fa-person-walking text-cyan-400"></i>
+                    <span>Alterar Pose e Rotação Corpo</span>
+                </h3>
+
+                <!-- Pose Presets Grid -->
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="selectPosePreset('front')" id="pose-btn-front" class="p-2.5 rounded-xl border border-cyan-500/60 bg-cyan-950/30 text-xs font-semibold text-cyan-300 transition flex items-center space-x-2">
+                        <i class="fa-solid fa-child text-sm"></i>
+                        <span>Frontal Neutra</span>
+                    </button>
+                    <button onclick="selectPosePreset('runway')" id="pose-btn-runway" class="p-2.5 rounded-xl border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800 text-xs font-semibold text-zinc-300 transition flex items-center space-x-2">
+                        <i class="fa-solid fa-person-walking-arrow-right text-sm"></i>
+                        <span>Passarela</span>
+                    </button>
+                    <button onclick="selectPosePreset('side')" id="pose-btn-side" class="p-2.5 rounded-xl border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800 text-xs font-semibold text-zinc-300 transition flex items-center space-x-2">
+                        <i class="fa-solid fa-person text-sm"></i>
+                        <span>Perfil 45°</span>
+                    </button>
+                    <button onclick="selectPosePreset('sitting')" id="pose-btn-sitting" class="p-2.5 rounded-xl border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800 text-xs font-semibold text-zinc-300 transition flex items-center space-x-2">
+                        <i class="fa-solid fa-chair text-sm"></i>
+                        <span>Sentada</span>
+                    </button>
+                </div>
+
+                <!-- Angle Sliders -->
+                <div class="space-y-3 pt-2">
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-zinc-400">Giro Horizontal (Yaw)</span>
+                            <span class="text-cyan-400 font-mono" id="val-yaw">0°</span>
+                        </div>
+                        <input type="range" min="-90" max="90" value="0" id="slider-yaw" oninput="updatePoseSliders()" class="w-full accent-cyan-400 bg-zinc-800 h-1.5 rounded-lg cursor-pointer">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-zinc-400">Inclinação Tronco (Pitch)</span>
+                            <span class="text-cyan-400 font-mono" id="val-pitch">0°</span>
+                        </div>
+                        <input type="range" min="-30" max="30" value="0" id="slider-pitch" oninput="updatePoseSliders()" class="w-full accent-cyan-400 bg-zinc-800 h-1.5 rounded-lg cursor-pointer">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-zinc-400">Abertura dos Braços</span>
+                            <span class="text-cyan-400 font-mono" id="val-arms">Relaxado</span>
+                        </div>
+                        <input type="range" min="1" max="3" value="1" step="1" id="slider-arms" onchange="updatePoseSliders()" class="w-full accent-cyan-400 bg-zinc-800 h-1.5 rounded-lg cursor-pointer">
+                    </div>
+                </div>
+            </div>
+
+        </aside>
+
+    </main>
+
+    <!-- EXPORT & RESOLUTION MODAL -->
+    <div id="export-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="glass-panel border border-cyan-500/40 rounded-3xl p-6 max-w-md w-full space-y-5 shadow-2xl relative">
+            <div class="flex items-center justify-between border-b border-darkborder pb-3">
+                <h3 class="font-bold text-base text-zinc-100 flex items-center space-x-2">
+                    <i class="fa-solid fa-file-export text-cyan-400"></i>
+                    <span>Exportar Imagem & Aumentar Qualidade</span>
+                </h3>
+                <button onclick="closeExportModal()" class="text-zinc-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="space-y-4">
+                <!-- Quality Selection -->
+                <div>
+                    <label class="text-xs font-semibold text-zinc-300 block mb-1.5">Resolução de Saída</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="setResolution('720p')" id="res-btn-720p" class="p-2.5 rounded-xl border border-zinc-800 bg-zinc-900 text-xs font-semibold text-zinc-400">720p HD</button>
+                        <button onclick="setResolution('1080p')" id="res-btn-1080p" class="p-2.5 rounded-xl border border-cyan-500 bg-cyan-950/40 text-xs font-semibold text-cyan-300">1080p Full HD</button>
+                        <button onclick="setResolution('4k')" id="res-btn-4k" class="p-2.5 rounded-xl border border-purple-500/60 bg-purple-950/40 text-xs font-semibold text-purple-300 flex items-center justify-center space-x-1">
+                            <i class="fa-solid fa-crown text-amber-400 text-[10px]"></i>
+                            <span>4K Ultra HD</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Format Selection -->
+                <div>
+                    <label class="text-xs font-semibold text-zinc-300 block mb-1.5">Formato do Arquivo</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="setExportFormat('png')" id="fmt-btn-png" class="p-2 rounded-xl border border-cyan-500 bg-cyan-950/40 text-xs font-semibold text-cyan-300">PNG (Sem Perda)</button>
+                        <button onclick="setExportFormat('jpg')" id="fmt-btn-jpg" class="p-2 rounded-xl border border-zinc-800 bg-zinc-900 text-xs font-semibold text-zinc-400">JPG Alta Qualidade</button>
+                        <button onclick="setExportFormat('webp')" id="fmt-btn-webp" class="p-2 rounded-xl border border-zinc-800 bg-zinc-900 text-xs font-semibold text-zinc-400">WEBP Leve</button>
+                    </div>
+                </div>
+
+                <!-- Super Resolution Upscaling Toggle -->
+                <div class="bg-zinc-900/80 p-3 rounded-2xl border border-zinc-800 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-bold text-zinc-200">IA Super-Resolution Upscaling</p>
+                        <p class="text-[10px] text-zinc-400">Aumenta nitidez de rostos, pele e textura de roupas em 4x</p>
+                    </div>
+                    <input type="checkbox" id="modal-upscale-toggle" checked class="accent-cyan-400 w-5 h-5 rounded cursor-pointer">
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-3 pt-2">
+                <button onclick="closeExportModal()" class="flex-1 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold rounded-xl text-xs transition">Cancelar</button>
+                <button onclick="downloadFinalImage()" class="flex-1 py-2.5 bg-gradient-to-r from-purple-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white font-extrabold rounded-xl text-xs transition shadow-lg shadow-purple-600/30 flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-download"></i>
+                    <span>Baixar Agora</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Message Container -->
+    <div id="toast-box" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+    <script>
+        // ... existing samplePhotos, stylePresets, fabricColors ...
+        const samplePhotos = [
+            { id: 1, name: 'Modelo Casual 1', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=800&auto=format&fit=crop' },
+            { id: 2, name: 'Modelo Casual 2', url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=800&auto=format&fit=crop' },
+            { id: 3, name: 'Modelo Fitness', url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=800&auto=format&fit=crop' }
+        ];
+
+        const stylePresets = [
+            { id: 'streetwear', name: 'Streetwear Moderno', icon: 'fa-user-ninja', color: '#8b5cf6', filter: 'contrast(105%) brightness(102%)' },
+            { id: 'elegance', name: 'Vestido de Gala / Terno', icon: 'fa-gem', color: '#f43f5e', filter: 'sepia(10%) saturate(120%)' },
+            { id: 'swimwear', name: 'Biquíni / Moda Praia', icon: 'fa-water-ladder', color: '#06b6d4', filter: 'saturate(140%) brightness(105%)' },
+            { id: 'casual', name: 'Jeans & Camiseta', icon: 'fa-shirt', color: '#10b981', filter: 'none' },
+            { id: 'fitness', name: 'Conjunto Esportivo', icon: 'fa-bolt', color: '#f59e0b', filter: 'contrast(110%)' }
+        ];
+
+        const fabricColors = ['#8b5cf6', '#06b6d4', '#f43f5e', '#10b981', '#f59e0b', '#18181b', '#ffffff', '#e11d48'];
+
+        const skinTones = [
+            { id: 'skin-1', color: '#f8d5c2', name: 'Claro Neutro' },
+            { id: 'skin-2', color: '#e0ac69', name: 'Dourado / Moreno Claro' },
+            { id: 'skin-3', color: '#c68642', name: 'Moreno Médio' },
+            { id: 'skin-4', color: '#8d5524', name: 'Negro Quente' },
+            { id: 'skin-5', color: '#3c2006', name: 'Negro Profundo' }
+        ];
+
+        const lipstickColors = ['#e11d48', '#be123c', '#9f1239', '#f43f5e', '#fb7185', '#a855f7'];
+
+        // App Active State
+        let currentPhotoUrl = samplePhotos[0].url;
+        let isBareSkinMode = false;
+        let activeStylePreset = stylePresets[0];
+        let activeGarmentColor = fabricColors[0];
+        let activeFabric = 'cotton';
+        let activeSkinTone = skinTones[1];
+
+        let compareMode = 'split'; // 'split' or 'side'
+        let canvasZoom = 1.0;
+        let isSkeletonVisible = false;
+
+        let poseYaw = 0;
+        let posePitch = 0;
+        let poseArms = '1';
+        let activePosePreset = 'front';
+
+        let exportResolution = '1080p';
+        let exportFormat = 'png';
+
+        // Initialize UI Elements on Load
+        window.addEventListener('DOMContentLoaded', () => {
+            renderSamplePhotos();
+            renderStylePresets();
+            renderGarmentColorSwatches();
+            renderSkinTonePalette();
+            renderLipstickColors();
+            initSplitSlider();
+            updateCanvasDisplay();
+        });
+
+        function setActiveTab(tab) {
+            ['outfit', 'makeup', 'pose'].forEach(t => {
+                const btn = document.getElementById(`tab-btn-${t}`);
+                const content = document.getElementById(`tab-content-${t}`);
+                if (t === tab) {
+                    btn.className = 'flex-1 py-2 text-xs font-bold rounded-xl transition flex items-center justify-center space-x-1.5 bg-purple-600 text-white shadow-md';
+                    content.classList.remove('hidden');
+                } else {
+                    btn.className = 'flex-1 py-2 text-xs font-bold rounded-xl transition flex items-center justify-center space-x-1.5 text-zinc-400 hover:text-white';
+                    content.classList.add('hidden');
+                }
+            });
+        }
+
+        function renderSkinTonePalette() {
+            const palette = document.getElementById('skin-tones-palette');
+            palette.innerHTML = '';
+            skinTones.forEach(st => {
+                const btn = document.createElement('button');
+                btn.onclick = () => {
+                    activeSkinTone = st;
+                    document.getElementById('skin-tone-val').innerText = st.name;
+                    renderSkinTonePalette();
+                    updateCanvasDisplay();
+                };
+                btn.className = `w-6 h-6 rounded-full flex-shrink-0 border-2 transition ${
+                    activeSkinTone.id === st.id ? 'border-rose-400 scale-110 shadow-lg' : 'border-transparent'
+                }`;
+                btn.style.backgroundColor = st.color;
+                palette.appendChild(btn);
+            });
+        }
+
+        function renderLipstickColors() {
+            const container = document.getElementById('lipstick-color-palette');
+            container.innerHTML = '';
+            lipstickColors.forEach(col => {
+                const btn = document.createElement('button');
+                btn.onclick = () => {
+                    showToast('Cor do batom atualizada!');
+                    updateCanvasDisplay();
+                };
+                btn.className = 'w-6 h-6 rounded-full flex-shrink-0 border border-white/20 hover:scale-110 transition cursor-pointer';
+                btn.style.backgroundColor = col;
+                container.appendChild(btn);
+            });
+        }
+
+        function setEyeshadow(preset) {
+            const labels = { natural: 'Natural Soft', smokey: 'Smokey Glam', gold: 'Dourado Radiante' };
+            document.getElementById('val-eyeshadow').innerText = labels[preset];
+            updateCanvasDisplay();
+            showToast(`Sombra alterada para: ${labels[preset]}`);
+        }
+
+        function setFoundation(type) {
+            if (type === 'matte') {
+                document.getElementById('fnd-btn-matte').className = 'p-2 rounded-xl border border-rose-500/60 bg-rose-950/30 text-xs font-semibold text-rose-300';
+                document.getElementById('fnd-btn-glow').className = 'p-2 rounded-xl border border-zinc-800 bg-zinc-900 text-xs font-semibold text-zinc-400';
+                document.getElementById('val-foundation').innerText = 'Matte HD';
+            } else {
+                document.getElementById('fnd-btn-glow').className = 'p-2 rounded-xl border border-rose-500/60 bg-rose-950/30 text-xs font-semibold text-rose-300';
+                document.getElementById('fnd-btn-matte').className = 'p-2 rounded-xl border border-zinc-800 bg-zinc-900 text-xs font-semibold text-zinc-400';
+                document.getElementById('val-foundation').innerText = 'Glow Radiante';
+            }
+            updateCanvasDisplay();
+        }
+
+        function updateMakeupSettings() {
+            const val = document.getElementById('slider-blush').value;
+            document.getElementById('val-blush').innerText = `${val}% Intensity`;
+            updateCanvasDisplay();
+        }
+
+        function toggleBareSkinMode(checked) {
+            isBareSkinMode = checked;
+            const ctrl = document.getElementById('anatomy-controls');
+            if (checked) {
+                ctrl.classList.remove('opacity-50', 'pointer-events-none');
+                showToast('Modo Despido Ativado: Recriação Anatômica Ativa');
+            } else {
+                ctrl.classList.add('opacity-50', 'pointer-events-none');
+                showToast('Roupas Restauradas');
+            }
+            renderStylePresets();
+            updateCanvasDisplay();
+        }
+
+        function updateAnatomySettings() {
+            const val = document.getElementById('slider-body-shape').value;
+            const shapes = { '1': 'Magra', '2': 'Natural', '3': 'Curvilínea', '4': 'Atlética' };
+            document.getElementById('val-body-shape').innerText = shapes[val];
+            updateCanvasDisplay();
+        }
+
+        function openExportModal() {
+            const modal = document.getElementById('export-modal');
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+        }
+
+        function closeExportModal() {
+            const modal = document.getElementById('export-modal');
+            modal.classList.add('opacity-0', 'pointer-events-none');
+        }
+
+        function setResolution(res) {
+            exportResolution = res;
+            ['720p', '1080p', '4k'].forEach(r => {
+                const btn = document.getElementById(`res-btn-${r}`);
+                if (r === res) {
+                    btn.className = r === '4k' ? 'p-2.5 rounded-xl border border-purple-500 bg-purple-950/60 text-xs font-semibold text-purple-300 flex items-center justify-center space-x-1' : 'p-2.5 rounded-xl border border-cyan-500 bg-cyan-950/40 text-xs font-semibold text-cyan-300';
+                } else {
+                    btn.className = 'p-2.5 rounded-xl border border-zinc-800 bg-zinc-900 text-xs font-semibold text-zinc-400';
+                }
+            });
+        }
+
+        function setExportFormat(fmt) {
+            exportFormat = fmt;
+            ['png', 'jpg', 'webp'].forEach(f => {
+                const btn = document.getElementById(`fmt-btn-${f}`);
+                if (f === fmt) {
+                    btn.className = 'p-2 rounded-xl border border-cyan-500 bg-cyan-950/40 text-xs font-semibold text-cyan-300';
+                } else {
+                    btn.className = 'p-2 rounded-xl border border-zinc-800 bg-zinc-900 text-xs font-semibold text-zinc-400';
+                }
+            });
+        }
+
+        function downloadFinalImage() {
+            closeExportModal();
+            showToast(`Imagem exportada em ${exportResolution.toUpperCase()} (${exportFormat.toUpperCase()}) com Nitidez Aprimorada!`);
+        }
+
+        // ... existing drag & drop, file handling, canvas rendering ...
+        function renderSamplePhotos() {
+            const container = document.getElementById('sample-photos-grid');
+            container.innerHTML = '';
+
+            samplePhotos.forEach(p => {
+                const img = document.createElement('img');
+                img.src = p.url;
+                img.alt = p.name;
+                img.onclick = () => selectSamplePhoto(p.url);
+                img.className = `w-full h-14 object-cover rounded-xl border-2 cursor-pointer transition transform hover:scale-105 ${
+                    currentPhotoUrl === p.url ? 'border-cyan-400 shadow-lg' : 'border-darkborder hover:border-zinc-500'
+                }`;
+                container.appendChild(img);
+            });
+        }
+
+        function selectSamplePhoto(url) {
+            currentPhotoUrl = url;
+            renderSamplePhotos();
+            updateCanvasDisplay();
+            showToast('Foto carregada no estúdio!');
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            document.getElementById('drop-zone').classList.add('border-cyan-400', 'bg-cyan-950/30');
+        }
+
+        function handleDragLeave() {
+            document.getElementById('drop-zone').classList.remove('border-cyan-400', 'bg-cyan-950/30');
+        }
+
+        function handleFileDrop(e) {
+            e.preventDefault();
+            handleDragLeave();
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                processUploadedFile(e.dataTransfer.files[0]);
+            }
+        }
+
+        function handleFileSelect(e) {
+            if (e.target.files && e.target.files[0]) {
+                processUploadedFile(e.target.files[0]);
+            }
+        }
+
+        function processUploadedFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                currentPhotoUrl = evt.target.result;
+                renderSamplePhotos();
+                updateCanvasDisplay();
+                showToast('Sua foto foi enviada com sucesso!');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function renderStylePresets() {
+            const grid = document.getElementById('preset-styles-grid');
+            grid.innerHTML = '';
+
+            stylePresets.forEach(preset => {
+                const isActive = (!isBareSkinMode) && (activeStylePreset.id === preset.id);
+                const btn = document.createElement('button');
+                btn.onclick = () => selectStylePreset(preset);
+                btn.className = `p-2.5 rounded-xl border transition flex items-center space-x-2 text-left ${
+                    isActive ? 'bg-purple-950/40 border-purple-500 text-white shadow-md' : 'bg-zinc-900/40 border-zinc-800 text-zinc-400 hover:bg-zinc-800/60'
+                }`;
+                btn.innerHTML = `
+                    <div class="w-6 h-6 rounded-lg flex items-center justify-center text-xs" style="background: ${preset.color}33; color: ${preset.color}">
+                        <i class="fa-solid ${preset.icon}"></i>
+                    </div>
+                    <span class="text-[11px] font-semibold">${preset.name}</span>
+                `;
+                grid.appendChild(btn);
+            });
+        }
+
+        function selectStylePreset(preset) {
+            isBareSkinMode = false;
+            document.getElementById('bare-mode-toggle').checked = false;
+            document.getElementById('anatomy-controls').classList.add('opacity-50', 'pointer-events-none');
+            activeStylePreset = preset;
+            renderStylePresets();
+            updateCanvasDisplay();
+            showToast(`Estilo alterado para: ${preset.name}`);
+        }
+
+        function renderGarmentColorSwatches() {
+            const container = document.getElementById('garment-color-swatches');
+            container.innerHTML = '';
+
+            fabricColors.forEach(color => {
+                const btn = document.createElement('button');
+                btn.onclick = () => {
+                    activeGarmentColor = color;
+                    renderGarmentColorSwatches();
+                    updateCanvasDisplay();
+                };
+                btn.className = `w-6 h-6 rounded-lg border-2 flex-shrink-0 transition transform hover:scale-110 ${
+                    activeGarmentColor === color ? 'border-white scale-105 shadow-md' : 'border-transparent'
+                }`;
+                btn.style.backgroundColor = color;
+                container.appendChild(btn);
+            });
+        }
+
+        function selectFabric(fab) {
+            activeFabric = fab;
+            ['cotton', 'leather', 'silk', 'denim'].forEach(f => {
+                const btn = document.getElementById(`fab-btn-${f}`);
+                if (f === fab) {
+                    btn.className = 'p-2 rounded-xl border border-cyan-500/50 bg-cyan-950/20 text-xs font-semibold text-cyan-300';
+                } else {
+                    btn.className = 'p-2 rounded-xl border border-zinc-800 bg-zinc-900 text-xs font-semibold text-zinc-400 hover:text-zinc-200';
+                }
+            });
+            updateCanvasDisplay();
+            showToast(`Textura alterada para: ${fab.toUpperCase()}`);
+        }
+
+        function selectPosePreset(pose) {
+            activePosePreset = pose;
+            ['front', 'runway', 'side', 'sitting'].forEach(p => {
+                const btn = document.getElementById(`pose-btn-${p}`);
+                if (p === pose) {
+                    btn.className = 'p-2.5 rounded-xl border border-cyan-500/60 bg-cyan-950/30 text-xs font-semibold text-cyan-300 transition flex items-center space-x-2';
+                } else {
+                    btn.className = 'p-2.5 rounded-xl border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800 text-xs font-semibold text-zinc-300 transition flex items-center space-x-2';
+                }
+            });
+
+            if (pose === 'front') { poseYaw = 0; posePitch = 0; }
+            if (pose === 'runway') { poseYaw = 15; posePitch = 5; }
+            if (pose === 'side') { poseYaw = 45; posePitch = 0; }
+            if (pose === 'sitting') { poseYaw = -20; posePitch = -10; }
+
+            document.getElementById('slider-yaw').value = poseYaw;
+            document.getElementById('slider-pitch').value = posePitch;
+            updatePoseSliders();
+        }
+
+        function updatePoseSliders() {
+            poseYaw = parseInt(document.getElementById('slider-yaw').value);
+            posePitch = parseInt(document.getElementById('slider-pitch').value);
+            poseArms = document.getElementById('slider-arms').value;
+
+            document.getElementById('val-yaw').innerText = `${poseYaw}°`;
+            document.getElementById('val-pitch').innerText = `${posePitch}°`;
+            
+            const armLabels = { '1': 'Relaxado', '2': 'Cintura', '3': 'Aberto' };
+            document.getElementById('val-arms').innerText = armLabels[poseArms];
+
+            updateCanvasDisplay();
+        }
+
+        function updateCanvasDisplay() {
+            const imgOrig = document.getElementById('img-original');
+            const imgTrans = document.getElementById('img-transformed');
+            const imgSplitBefore = document.getElementById('img-split-before');
+
+            imgOrig.src = currentPhotoUrl;
+            imgTrans.src = currentPhotoUrl;
+            imgSplitBefore.src = currentPhotoUrl;
+
+            // Apply Pose & Transformation CSS Simulation Filters
+            let transformCSS = `scale(${canvasZoom}) rotateY(${poseYaw}deg) rotateX(${posePitch}deg)`;
+            imgTrans.style.transform = transformCSS;
+            imgOrig.style.transform = `scale(${canvasZoom})`;
+            imgSplitBefore.style.transform = `scale(${canvasZoom})`;
+
+            // Enhancement Toggles
+            const upscaleOn = document.getElementById('chk-upscale') ? document.getElementById('chk-upscale').checked : true;
+            let enhancementFilter = upscaleOn ? ' contrast(108%) saturate(105%)' : '';
+
+            // Filter for Bare Skin Simulation vs Outfit Styles
+            if (isBareSkinMode) {
+                imgTrans.style.filter = 'saturate(130%) contrast(115%) hue-rotate(-10deg) brightness(105%)' + enhancementFilter;
+                document.getElementById('canvas-status-text').innerText = `Recriação Corporal: ${activeSkinTone.name}`;
+            } else {
+                imgTrans.style.filter = activeStylePreset.filter + enhancementFilter;
+                document.getElementById('canvas-status-text').innerText = `Visualização: ${activeStylePreset.name}`;
+            }
+
+            drawSkeletonOverlay();
+        }
+
+        function setCompareMode(mode) {
+            compareMode = mode;
+            const splitBox = document.getElementById('split-slider-box');
+            const splitHandle = document.getElementById('split-handle-btn');
+            const btnSplit = document.getElementById('btn-mode-split');
+            const btnSide = document.getElementById('btn-mode-side');
+
+            if (mode === 'split') {
+                splitBox.style.display = 'block';
+                splitHandle.style.display = 'flex';
+                btnSplit.className = 'px-2.5 py-1 rounded-lg bg-cyan-600 text-white font-semibold transition';
+                btnSide.className = 'px-2.5 py-1 rounded-lg hover:bg-white/10 text-zinc-400 font-medium transition';
+            } else {
+                splitBox.style.display = 'none';
+                splitHandle.style.display = 'none';
+                btnSide.className = 'px-2.5 py-1 rounded-lg bg-cyan-600 text-white font-semibold transition';
+                btnSplit.className = 'px-2.5 py-1 rounded-lg hover:bg-white/10 text-zinc-400 font-medium transition';
+            }
+        }
+
+        function initSplitSlider() {
+            const handle = document.getElementById('split-handle-btn');
+            const overlay = document.getElementById('split-slider-box');
+            const wrapper = document.getElementById('photo-wrapper');
+
+            let isDragging = false;
+
+            const onMove = (clientX) => {
+                if (!isDragging) return;
+                const rect = wrapper.getBoundingClientRect();
+                let x = clientX - rect.left;
+                if (x < 0) x = 0;
+                if (x > rect.width) x = rect.width;
+
+                const percent = (x / rect.width) * 100;
+                overlay.style.width = `${percent}%`;
+                handle.style.left = `${percent}%`;
+            };
+
+            handle.addEventListener('mousedown', () => isDragging = true);
+            window.addEventListener('mouseup', () => isDragging = false);
+            window.addEventListener('mousemove', (e) => onMove(e.clientX));
+
+            handle.addEventListener('touchstart', () => isDragging = true);
+            window.addEventListener('touchend', () => isDragging = false);
+            window.addEventListener('touchmove', (e) => onMove(e.touches[0].clientX));
+        }
+
+        function zoomCanvas(delta) {
+            canvasZoom = Math.max(0.8, Math.min(1.8, canvasZoom + delta));
+            updateCanvasDisplay();
+        }
+
+        function resetCanvasZoom() {
+            canvasZoom = 1.0;
+            poseYaw = 0;
+            posePitch = 0;
+            document.getElementById('slider-yaw').value = 0;
+            document.getElementById('slider-pitch').value = 0;
+            updatePoseSliders();
+        }
+
+        function toggleSkeletonOverlay() {
+            isSkeletonVisible = !isSkeletonVisible;
+            const btn = document.getElementById('btn-toggle-skeleton');
+            if (isSkeletonVisible) {
+                btn.className = 'px-3 py-1.5 bg-cyan-600 text-white rounded-xl text-xs font-semibold transition border border-cyan-400 flex items-center space-x-1.5 shadow-lg';
+            } else {
+                btn.className = 'px-3 py-1.5 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 rounded-xl text-xs font-semibold transition border border-zinc-700 flex items-center space-x-1.5';
+            }
+            drawSkeletonOverlay();
+        }
+
+        function drawSkeletonOverlay() {
+            const canvas = document.getElementById('stage-overlay-canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (!isSkeletonVisible) return;
+
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+
+            ctx.strokeStyle = '#06b6d4';
+            ctx.fillStyle = '#a855f7';
+            ctx.lineWidth = 3;
+
+            const head = { x: cx + poseYaw, y: cy - 110 };
+            const neck = { x: cx + poseYaw * 0.8, y: cy - 70 };
+            const leftShoulder = { x: cx - 45 + poseYaw * 0.5, y: cy - 60 };
+            const rightShoulder = { x: cx + 45 + poseYaw * 0.5, y: cy - 60 };
+            const hip = { x: cx + poseYaw * 0.3, y: cy + 30 };
+
+            ctx.beginPath();
+            ctx.moveTo(head.x, head.y); ctx.lineTo(neck.x, neck.y);
+            ctx.moveTo(leftShoulder.x, leftShoulder.y); ctx.lineTo(rightShoulder.x, rightShoulder.y);
+            ctx.moveTo(neck.x, neck.y); ctx.lineTo(hip.x, hip.y);
+            ctx.stroke();
+
+            [head, neck, leftShoulder, rightShoulder, hip].forEach(pt => {
+                ctx.beginPath();
+                ctx.arc(pt.x, pt.y, 6, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            });
+        }
+
+        function triggerAIGeneration() {
+            const modal = document.getElementById('ai-processing-modal');
+            const pBar = document.getElementById('ai-progress-bar');
+            const stepTitle = document.getElementById('ai-step-title');
+            const stepDetail = document.getElementById('ai-step-detail');
+
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            pBar.style.width = '0%';
+
+            const steps = [
+                { percent: '25%', title: '1. Mapeamento Anatômico...', detail: 'Detectando pontos vitais e formato do corpo' },
+                { percent: '55%', title: '2. Recriação Corporal / Estilo...', detail: isBareSkinMode ? 'Reconstruindo tom de pele e silhueta sem roupas' : `Aplicando estilo ${activeStylePreset.name}` },
+                { percent: '85%', title: '3. Aprimoramento de Nitidez...', detail: 'Aplicando IA Super-Resolution para alta definição' },
+                { percent: '100%', title: '4. Concluído!', detail: 'Ajustando iluminação final e maquiagem' }
+            ];
+
+            let index = 0;
+            const interval = setInterval(() => {
+                if (index < steps.length) {
+                    pBar.style.width = steps[index].percent;
+                    stepTitle.innerText = steps[index].title;
+                    stepDetail.innerText = steps[index].detail;
+                    index++;
+                } else {
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        modal.classList.add('opacity-0', 'pointer-events-none');
+                        showToast('Transformação HD concluída com sucesso!');
+                    }, 400);
+                }
+            }, 500);
+        }
+
+        function showToast(msg) {
+            const box = document.getElementById('toast-box');
+            const toast = document.createElement('div');
+            toast.className = 'bg-darkcard border border-cyan-500/50 text-zinc-100 px-4 py-2.5 rounded-xl text-xs font-semibold shadow-2xl flex items-center space-x-2 transition-all duration-300 transform translate-y-2 opacity-0';
+            toast.innerHTML = `
+                <i class="fa-solid fa-sparkles text-cyan-400"></i>
+                <span>${msg}</span>
+            `;
+            box.appendChild(toast);
+
+            setTimeout(() => toast.classList.remove('translate-y-2', 'opacity-0'), 10);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 2600);
+        }
+    </script>
+</body>
+</html>
